@@ -118,16 +118,64 @@ function escapeHtml(s){
  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+
+let mangaOffset = 0;
+const mangaLimit = 100;
+let mangaQuery = '';
+let mangaTotal = 0;
+
 async function search(){
- const q=document.getElementById('query').value.trim();
- document.getElementById('status').textContent='Sedang mencari...';
+ mangaQuery=document.getElementById('query').value.trim();
+ mangaOffset=0;
+ document.getElementById('books').innerHTML='';
+ await loadManga(false);
+}
+
+async function loadMore(){
+ await loadManga(true);
+}
+
+async function loadManga(append){
+ const status=document.getElementById('status');
+ const books=document.getElementById('books');
+ status.textContent='Sedang mencari...';
+
+ let more=document.getElementById('loadMoreBtn');
+ if(!more){
+  books.insertAdjacentHTML('afterend',
+   '<button id="loadMoreBtn" onclick="loadMore()" style="margin:20px auto;display:block">Muat Lagi</button>');
+  more=document.getElementById('loadMoreBtn');
+ }
+
+ more.disabled=true;
+ more.textContent='Memuatkan...';
+
  try{
-  const path='/manga?limit=30&includes[]=cover_art&order[followedCount]=desc&contentRating[]=safe&contentRating[]=suggestive'+(q?'&title='+encodeURIComponent(q):'');
+  const path='/manga?limit='+mangaLimit+'&offset='+mangaOffset+
+   '&includes[]=cover_art&order[followedCount]=desc'+
+   '&contentRating[]=safe&contentRating[]=suggestive'+
+   (mangaQuery?'&title='+encodeURIComponent(mangaQuery):'');
+
   const result=await api(path);
-  document.getElementById('books').innerHTML=result.data.map(card).join('')||'<p>Tiada tajuk ditemui.</p>';
-  document.getElementById('status').textContent='Menjumpai '+result.data.length+' tajuk';
+  const items=result.data||[];
+  mangaTotal=result.total||0;
+
+  books.innerHTML=append
+   ? books.innerHTML+items.map(card).join('')
+   : items.map(card).join('');
+
+  mangaOffset+=items.length;
+  status.textContent='Menjumpai '+books.querySelectorAll('.book').length+
+   ' daripada '+mangaTotal+' tajuk';
+
+  more.style.display=mangaOffset<mangaTotal?'block':'none';
+  more.disabled=false;
+  more.textContent='Muat Lagi';
+  if(!items.length && !append) books.innerHTML='<p>Tiada tajuk ditemui.</p>';
  }catch(e){
-  document.getElementById('status').textContent='Gagal: '+e.message;
+  status.textContent='Gagal: '+e.message;
+  more.disabled=false;
+  more.textContent='Cuba Lagi';
  }
 }
 
@@ -144,7 +192,7 @@ async function openManga(id){
    <img style="width:145px;border-radius:12px" src="${coverOf(x)}">
    <p>${escapeHtml(x.attributes.description?.en||'Tiada sinopsis tersedia.')}</p>
    <button onclick="bookmark('${id}')">♡ Bookmark</button>`;
-  const feed=await api('/manga/'+id+'/feed?limit=100&translatedLanguage[]=id&order[chapter]=asc');
+  const feed=await api('/manga/'+id+'/feed?limit=100&translatedLanguage[]=id&translatedLanguage[]=en&order[chapter]=desc');
   document.getElementById('chapters').innerHTML=feed.data.map(c=>
    `<div class="item">
    <b>Bab ${escapeHtml(c.attributes.chapter||'?')}</b>
