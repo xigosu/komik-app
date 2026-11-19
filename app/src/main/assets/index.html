@@ -102,13 +102,23 @@ function coverOf(m){
  return file?'https://uploads.mangadex.org/covers/'+m.id+'/'+file+'.256.jpg':'';
 }
 
+function originInfo(m){
+ const lang=(m.attributes?.originalLanguage||'').toLowerCase();
+ if(lang==='ja') return {flag:'🇯🇵',label:'MANGA',country:'Jepun'};
+ if(lang==='ko') return {flag:'🇰🇷',label:'MANHWA',country:'Korea'};
+ if(lang.startsWith('zh')) return {flag:'🇨🇳',label:'MANHUA',country:'China'};
+ return {flag:'🌐',label:'TIDAK DIKETAHUI',country:'Asal tidak diketahui'};
+}
+
 function card(m){
  const name=titleOf(m);
  const img=coverOf(m);
+ const origin=originInfo(m);
  return `<div class="book">
+ <div style="display:inline-block;background:#eadcff;color:#6336a5;padding:5px 9px;border-radius:12px;font-size:12px;font-weight:bold;margin-bottom:6px">${origin.flag} ${origin.label}</div>
  <img src="${img}" loading="lazy" alt="Cover">
  <b>${escapeHtml(name)}</b>
- <small>${escapeHtml(m.attributes.status||'Manga')}</small>
+ <small>${origin.country}</small>
  <p><button onclick="openManga('${m.id}')">Lihat chapter</button>
  <button onclick="bookmark('${m.id}')">♡</button></p>
  </div>`;
