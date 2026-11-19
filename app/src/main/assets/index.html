@@ -144,7 +144,7 @@ async function openManga(id){
    <img style="width:145px;border-radius:12px" src="${coverOf(x)}">
    <p>${escapeHtml(x.attributes.description?.en||'Tiada sinopsis tersedia.')}</p>
    <button onclick="bookmark('${id}')">♡ Bookmark</button>`;
-  const feed=await api('/manga/'+id+'/feed?limit=100&translatedLanguage[]=en&order[chapter]=asc');
+  const feed=await api('/manga/'+id+'/feed?limit=100&translatedLanguage[]=id&order[chapter]=asc');
   document.getElementById('chapters').innerHTML=feed.data.map(c=>
    `<div class="item">
    <b>Bab ${escapeHtml(c.attributes.chapter||'?')}</b>
