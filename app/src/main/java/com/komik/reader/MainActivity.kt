@@ -84,7 +84,7 @@ class MainActivity : Activity() {
 
                 WebResourceResponse(
                     mime,
-                    "UTF-8",
+                    null,
                     code,
                     "OK",
                     mapOf("Access-Control-Allow-Origin" to "*"),
