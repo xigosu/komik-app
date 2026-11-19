@@ -36,7 +36,7 @@ button{border:0;padding:11px 15px;border-radius:20px;background:#8c6af2;color:wh
 <section id="home" class="page active">
 <h1>Teroka Manga ✨</h1>
 <p>Katalog manga dan manhwa daripada MangaDex</p>
-<input id="query" placeholder="Cari tajuk manga / manhwa..." onkeydown="if(event.key==='Enter')search()">
+<input id="query" placeholder="Cari nama rasmi atau nama alternatif komik..." onkeydown="if(event.key==='Enter')search()">
 <button onclick="search()">Cari komik</button>
 <select id="category" onchange="search()" style="width:100%;padding:13px;border-radius:14px;background:#22222b;color:white;border:1px solid #444;margin-top:12px">
 <option value="">Semua komik</option>
@@ -117,8 +117,16 @@ function originInfo(m){
  return {flag:'🌐',label:'TIDAK DIKETAHUI',country:'Asal tidak diketahui'};
 }
 
+function alternateTitlesOf(m){
+ const titles=m.attributes?.altTitles||[];
+ const main=titleOf(m).toLowerCase();
+ return [...new Set(titles.flatMap(x=>Object.values(x||{}))
+  .filter(x=>x&&x.toLowerCase()!==main))].slice(0,2);
+}
+
 function card(m){
  const name=titleOf(m);
+ const aliases=alternateTitlesOf(m);
  const img=coverOf(m);
  const origin=originInfo(m);
  return `<div class="book">
@@ -126,6 +134,7 @@ function card(m){
  <img src="${img}" loading="lazy" alt="Cover">
  <b>${escapeHtml(name)}</b>
  <small>${origin.country}</small>
+ ${aliases.length?`<small style="display:block;margin-top:5px;color:#c5adff">Nama lain: ${aliases.map(escapeHtml).join(' • ')}</small>`:''}
  <p><button onclick="openManga('${m.id}')">Lihat chapter</button>
  <button onclick="bookmark('${m.id}')">♡</button></p>
  </div>`;
