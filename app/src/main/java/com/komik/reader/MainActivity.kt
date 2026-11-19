@@ -4,21 +4,64 @@ import android.app.Activity
 import android.os.Bundle
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.JavascriptInterface
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : Activity() {
+
+    private lateinit var web: WebView
+
+    inner class MangaApi {
+        @JavascriptInterface
+        fun get(path: String): String {
+            if (!path.startsWith("/manga") &&
+                !path.startsWith("/chapter") &&
+                !path.startsWith("/at-home/server/")) {
+                return """{"error":"Endpoint tidak dibenarkan"}"""
+            }
+
+            return try {
+                val connection = URL(
+                    "https://api.mangadex.org$path"
+                ).openConnection() as HttpURLConnection
+
+                connection.requestMethod = "GET"
+                connection.setRequestProperty(
+                    "User-Agent",
+                    "KOMIK/1.0 (Android Reader)"
+                )
+                connection.connectTimeout = 15000
+                connection.readTimeout = 20000
+
+                val stream = if (connection.responseCode in 200..299)
+                    connection.inputStream else connection.errorStream
+
+                val result = stream.bufferedReader().use { it.readText() }
+                connection.disconnect()
+                result
+            } catch (e: Exception) {
+                """{"error":"${e.message ?: "Sambungan gagal"}"}"""
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val web = WebView(this)
+
+        web = WebView(this)
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
+        web.addJavascriptInterface(MangaApi(), "MangaApi")
         web.webViewClient = WebViewClient()
         web.loadUrl("file:///android_asset/index.html")
+
         setContentView(web)
     }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        val web = (window.decorView.findViewById(android.R.id.content) as? android.view.ViewGroup)
-            ?.getChildAt(0) as? WebView
-        if (web?.canGoBack() == true) web.goBack() else super.onBackPressed()
+        if (web.canGoBack()) web.goBack()
+        else super.onBackPressed()
     }
 }
