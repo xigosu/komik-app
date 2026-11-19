@@ -195,7 +195,7 @@ async function openManga(id){
   const feed=await api('/manga/'+id+'/feed?limit=100&translatedLanguage[]=id&translatedLanguage[]=en&order[chapter]=desc');
   document.getElementById('chapters').innerHTML=feed.data.map(c=>
    `<div class="item">
-   <b>Bab ${escapeHtml(c.attributes.chapter||'?')}</b>
+   <b>Chapter ${escapeHtml(c.attributes.chapter||'?')}</b>
    <p>${escapeHtml(c.attributes.title||'')}</p>
    <button onclick="readChapter('${c.id}')">Baca</button>
    </div>`
