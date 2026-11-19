@@ -189,9 +189,14 @@ async function loadManga(append){
  }
 }
 
+let chapterOffset = 0;
+let chapterTotal = 0;
+
 async function openManga(id){
  go('details');
  currentManga=id;
+ chapterOffset=0;
+ chapterTotal=0;
  document.getElementById('detail').innerHTML='<p>Memuatkan maklumat...</p>';
  document.getElementById('chapters').innerHTML='';
  try{
@@ -202,16 +207,52 @@ async function openManga(id){
    <img style="width:145px;border-radius:12px" src="${coverOf(x)}">
    <p>${escapeHtml(x.attributes.description?.en||'Tiada sinopsis tersedia.')}</p>
    <button onclick="bookmark('${id}')">♡ Bookmark</button>`;
-  const feed=await api('/manga/'+id+'/feed?limit=100&translatedLanguage[]=id&translatedLanguage[]=en&order[chapter]=desc');
-  document.getElementById('chapters').innerHTML=feed.data.map(c=>
+  await loadChapters(id,false);
+ }catch(e){
+  document.getElementById('detail').innerHTML='<p>Gagal memuatkan: '+escapeHtml(e.message)+'</p>';
+ }
+}
+
+async function loadChapters(id,append=false){
+ const el=document.getElementById('chapters');
+ const oldButton=document.getElementById('moreChapters');
+ if(oldButton) oldButton.remove();
+
+ if(!append) el.innerHTML='<p>Memuatkan chapter...</p>';
+
+ try{
+  const path='/manga/'+id+'/feed?limit=100&offset='+chapterOffset+
+   '&translatedLanguage[]=id&translatedLanguage[]=en&order[chapter]=desc';
+
+  const feed=await api(path);
+  const items=feed.data||[];
+  chapterTotal=feed.total||0;
+
+  const html=items.map(c=>
    `<div class="item">
    <b>Chapter ${escapeHtml(c.attributes.chapter||'?')}</b>
    <p>${escapeHtml(c.attributes.title||'')}</p>
    <button onclick="readChapter('${c.id}')">Baca</button>
    </div>`
-  ).join('')||'<p>Belum ada chapter tersedia.</p>';
+  ).join('');
+
+  if(!append) el.innerHTML='';
+  el.insertAdjacentHTML('beforeend',html);
+
+  chapterOffset+=items.length;
+
+  if(!chapterOffset){
+   el.innerHTML='<p>Belum ada chapter tersedia.</p>';
+  }else if(chapterOffset<chapterTotal){
+   el.insertAdjacentHTML('beforeend',
+    `<button id="moreChapters" onclick="loadChapters('${id}',true)">Muat Lagi Chapter (${chapterOffset}/${chapterTotal})</button>`
+   );
+  }else{
+   el.insertAdjacentHTML('beforeend','<p>Semua chapter yang tersedia telah dimuatkan.</p>');
+  }
  }catch(e){
-  document.getElementById('detail').innerHTML='<p>Gagal memuatkan: '+escapeHtml(e.message)+'</p>';
+  el.insertAdjacentHTML('beforeend',
+   '<p>Gagal memuatkan chapter: '+escapeHtml(e.message)+'</p>');
  }
 }
 
