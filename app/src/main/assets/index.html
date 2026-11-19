@@ -38,8 +38,15 @@ button{border:0;padding:11px 15px;border-radius:20px;background:#8c6af2;color:wh
 <p>Katalog manga dan manhwa daripada MangaDex</p>
 <input id="query" placeholder="Cari tajuk manga / manhwa..." onkeydown="if(event.key==='Enter')search()">
 <button onclick="search()">Cari komik</button>
+<select id="category" onchange="search()" style="width:100%;padding:13px;border-radius:14px;background:#22222b;color:white;border:1px solid #444;margin-top:12px">
+<option value="">Semua komik</option>
+<option value="ja">🇯🇵 Manga</option>
+<option value="ko">🇰🇷 Manhwa</option>
+<option value="zh">🇨🇳 Manhua</option>
+</select>
 <div id="status">Memuatkan katalog...</div>
 <div class="grid" id="books"></div>
+<div id="catalogSentinel" style="text-align:center;padding:20px;color:#c5adff">Memuatkan lagi apabila scroll...</div>
 </section>
 
 <section id="details" class="page">
@@ -132,7 +139,7 @@ function escapeHtml(s){
 let mangaOffset = 0;
 const mangaLimit = 100;
 let mangaQuery = '';
-let mangaTotal = 0;
+let mangaTotal = 0;\nlet mangaLoading = false;\nlet chapterLoading = false;
 
 async function search(){
  mangaQuery=document.getElementById('query').value.trim();
@@ -146,46 +153,61 @@ async function loadMore(){
 }
 
 async function loadManga(append){
+ if(mangaLoading) return;
+ mangaLoading=true;
+
  const status=document.getElementById('status');
  const books=document.getElementById('books');
- status.textContent='Sedang mencari...';
+ const sentinel=document.getElementById('catalogSentinel');
 
- let more=document.getElementById('loadMoreBtn');
- if(!more){
-  books.insertAdjacentHTML('afterend',
-   '<button id="loadMoreBtn" onclick="loadMore()" style="margin:20px auto;display:block">Muat Lagi</button>');
-  more=document.getElementById('loadMoreBtn');
- }
-
- more.disabled=true;
- more.textContent='Memuatkan...';
+ status.textContent='Sedang memuatkan komik...';
+ sentinel.textContent='Memuatkan...';
 
  try{
-  const path='/manga?limit='+mangaLimit+'&offset='+mangaOffset+
+  const category=document.getElementById('category').value;
+  let lang='';
+  if(category==='ja') lang='&originalLanguage[]=ja';
+  if(category==='ko') lang='&originalLanguage[]=ko';
+  if(category==='zh') lang='&originalLanguage[]=zh&originalLanguage[]=zh-hk&originalLanguage[]=zh-ro';
+
+  const path='/manga?limit=100&offset='+mangaOffset+
    '&includes[]=cover_art&order[followedCount]=desc'+
    '&contentRating[]=safe&contentRating[]=suggestive'+
+   lang+
    (mangaQuery?'&title='+encodeURIComponent(mangaQuery):'');
 
   const result=await api(path);
   const items=result.data||[];
   mangaTotal=result.total||0;
 
-  books.innerHTML=append
-   ? books.innerHTML+items.map(card).join('')
-   : items.map(card).join('');
+  if(!append) books.innerHTML='';
+
+  if(items.length){
+   books.insertAdjacentHTML('beforeend',items.map(card).join(''));
+  }
 
   mangaOffset+=items.length;
-  status.textContent='Menjumpai '+books.querySelectorAll('.book').length+
+
+  status.textContent='Ditemui '+books.querySelectorAll('.book').length+
    ' daripada '+mangaTotal+' tajuk';
 
-  more.style.display=mangaOffset<mangaTotal?'block':'none';
-  more.disabled=false;
-  more.textContent='Muat Lagi';
-  if(!items.length && !append) books.innerHTML='<p>Tiada tajuk ditemui.</p>';
+  if(!items.length && !append){
+   books.innerHTML='<p>Tiada tajuk ditemui.</p>';
+  }
+
+  if(mangaOffset>=mangaTotal || !items.length){
+   sentinel.textContent='Semua tajuk yang tersedia telah dimuatkan.';
+   sentinel.dataset.done='yes';
+  }else{
+   sentinel.textContent='Scroll ke bawah untuk memuatkan lagi komik';
+   sentinel.dataset.done='no';
+   if(catalogObserver) catalogObserver.observe(sentinel);
+  }
  }catch(e){
   status.textContent='Gagal: '+e.message;
-  more.disabled=false;
-  more.textContent='Cuba Lagi';
+  sentinel.textContent='Gagal memuatkan. Scroll atau cuba cari semula.';
+ }finally{
+  mangaLoading=false;
  }
 }
 
@@ -214,9 +236,12 @@ async function openManga(id){
 }
 
 async function loadChapters(id,append=false){
+ if(chapterLoading) return;
+ chapterLoading=true;
+
  const el=document.getElementById('chapters');
- const oldButton=document.getElementById('moreChapters');
- if(oldButton) oldButton.remove();
+ const oldSentinel=document.getElementById('chapterSentinel');
+ if(oldSentinel) oldSentinel.remove();
 
  if(!append) el.innerHTML='<p>Memuatkan chapter...</p>';
 
@@ -225,8 +250,12 @@ async function loadChapters(id,append=false){
    '&translatedLanguage[]=id&translatedLanguage[]=en&order[chapter]=desc';
 
   const feed=await api(path);
+  if(id!==currentManga) return;
+
   const items=feed.data||[];
   chapterTotal=feed.total||0;
+
+  if(!append) el.innerHTML='';
 
   const html=items.map(c=>
    `<div class="item">
@@ -236,23 +265,24 @@ async function loadChapters(id,append=false){
    </div>`
   ).join('');
 
-  if(!append) el.innerHTML='';
   el.insertAdjacentHTML('beforeend',html);
-
   chapterOffset+=items.length;
 
   if(!chapterOffset){
    el.innerHTML='<p>Belum ada chapter tersedia.</p>';
-  }else if(chapterOffset<chapterTotal){
+  }else if(chapterOffset<chapterTotal && items.length){
    el.insertAdjacentHTML('beforeend',
-    `<button id="moreChapters" onclick="loadChapters('${id}',true)">Muat Lagi Chapter (${chapterOffset}/${chapterTotal})</button>`
-   );
+    '<div id="chapterSentinel" style="text-align:center;padding:20px;color:#c5adff">Scroll untuk memuatkan chapter seterusnya...</div>');
+   if(chapterObserver) chapterObserver.observe(document.getElementById('chapterSentinel'));
   }else{
-   el.insertAdjacentHTML('beforeend','<p>Semua chapter yang tersedia telah dimuatkan.</p>');
+   el.insertAdjacentHTML('beforeend',
+    '<p>Semua chapter yang tersedia telah dimuatkan.</p>');
   }
  }catch(e){
   el.insertAdjacentHTML('beforeend',
    '<p>Gagal memuatkan chapter: '+escapeHtml(e.message)+'</p>');
+ }finally{
+  chapterLoading=false;
  }
 }
 
@@ -286,6 +316,35 @@ async function renderSaved(){
   const result=await api('/manga?limit=100&ids[]='+saved.join('&ids[]=')+'&includes[]=cover_art');
   el.innerHTML='<div class="grid">'+result.data.map(card).join('')+'</div>';
  }catch(e){el.innerHTML='<p>'+escapeHtml(e.message)+'</p>'}
+}
+
+
+let catalogObserver=null;
+let chapterObserver=null;
+
+if('IntersectionObserver' in window){
+ catalogObserver=new IntersectionObserver(entries=>{
+  if(entries.some(x=>x.isIntersecting) &&
+     document.getElementById('home').classList.contains('active') &&
+     document.getElementById('catalogSentinel').dataset.done!=='yes'){
+   loadManga(true);
+  }
+ },{rootMargin:'500px'});
+
+ chapterObserver=new IntersectionObserver(entries=>{
+  if(entries.some(x=>x.isIntersecting) &&
+     document.getElementById('details').classList.contains('active') &&
+     currentManga){
+   loadChapters(currentManga,true);
+  }
+ },{rootMargin:'500px'});
+}else{
+ window.addEventListener('scroll',()=>{
+  if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500){
+   if(document.getElementById('home').classList.contains('active')) loadManga(true);
+   if(document.getElementById('details').classList.contains('active') && currentManga) loadChapters(currentManga,true);
+  }
+ });
 }
 
 search();
